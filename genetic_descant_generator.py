@@ -408,15 +408,18 @@ class FitnessEvaluator:
     #     return score / 3
 
 
-def create_score(descant, chord_sequence, chord_mappings):
+def create_score(descant, melody, chord_sequence, chord_mappings):
     """
-    Create a music21 score with a given descant and chord sequence.
+    Create a music21 score with a given descant, melody, and chord sequence.
 
     Args:
         descant (list): A list of tuples representing notes in the format
             (note_name, duration).
+        melody (list): A list of tuples representing notes in the format
+            (note_name, duration).
         chord_sequence (list): A list of tuples representing chords
-            in the format (chord symbol, duration).
+            in the format (chord_symbol, duration).
+        chord_mappings (dict): Available chords mapped to their notes.
 
     Returns:
         music21.stream.Score: A music score containing the descant and chord
@@ -430,6 +433,12 @@ def create_score(descant, chord_sequence, chord_mappings):
     for note_name, duration in descant:
         descant_note = music21.note.Note(note_name, quarterLength=duration)
         descant_part.append(descant_note)
+
+    # Create the melody part and add notes to it
+    melody_part = music21.stream.Part()
+    for note_name, duration in melody:
+        melody_note = music21.note.Note(note_name, quarterLength=duration)
+        melody_part.append(melody_note)
 
     # Create the chord part and add chords to it
     chord_part = music21.stream.Part()
@@ -448,75 +457,13 @@ def create_score(descant, chord_sequence, chord_mappings):
 
     # Append parts to the score
     score.append(descant_part)
+    score.append(melody_part)
     score.append(chord_part)
 
     return score
 
 
 def main():
-
-    # twinkle_twinkle_melody = [
-    #     ("C5", 1),
-    #     ("C5", 1),
-    #     ("G5", 1),
-    #     ("G5", 1),
-    #     ("A5", 1),
-    #     ("A5", 1),
-    #     ("G5", 2),  # Twinkle, twinkle, little star,
-    #     ("F5", 1),
-    #     ("F5", 1),
-    #     ("E5", 1),
-    #     ("E5", 1),
-    #     ("D5", 1),
-    #     ("D5", 1),
-    #     ("C5", 2),  # How I wonder what you are!
-    #     ("G5", 1),
-    #     ("G5", 1),
-    #     ("F5", 1),
-    #     ("F5", 1),
-    #     ("E5", 1),
-    #     ("E5", 1),
-    #     ("D5", 2),  # Up above the world so high,
-    #     ("G5", 1),
-    #     ("G5", 1),
-    #     ("F5", 1),
-    #     ("F5", 1),
-    #     ("E5", 1),
-    #     ("E5", 1),
-    #     ("D5", 2),  # Like a diamond in the sky.
-    #     ("C5", 1),
-    #     ("C5", 1),
-    #     ("G5", 1),
-    #     ("G5", 1),
-    #     ("A5", 1),
-    #     ("A5", 1),
-    #     ("G5", 2),  # Twinkle, twinkle, little star,
-    #     ("F5", 1),
-    #     ("F5", 1),
-    #     ("E5", 1),
-    #     ("E5", 1),
-    #     ("D5", 1),
-    #     ("D5", 1),
-    #     ("C5", 2)  # How I wonder what you are!
-    # ]
-    
-    # weights = {
-    #     "chord_melody_congruence": 0.4,
-    #     "chord_variety": 0.1,
-    #     "harmonic_flow": 0.3,
-    #     "functional_harmony": 0.2
-    # }
-
-    # preferred_transitions = {
-    #     "C": ["G", "Am", "F"],
-    #     "Dm": ["G", "Am"],
-    #     "Em": ["Am", "F", "C"],
-    #     "F": ["C", "G"],
-    #     "G": ["Am", "C"],
-    #     "Am": ["Dm", "Em", "F", "C"],
-    #     "Bdim": ["F", "Am"]
-    # }
-
     jesus_loves_me_chords = [
         ("C", 4),
         ("C", 4),
@@ -538,10 +485,61 @@ def main():
         ("G", 2),
         ("C", 4)
     ]
+    jesus_loves_me_melody = [
+        ("G4", 1),
+        ("E4", 1),
+        ("E4", 1),
+        ("D4", 1),
+        ("E4", 1),
+        ("G4", 1),
+        ("G4", 2),
+        ("A4", 1),
+        ("A4", 1),
+        ("C5", 1),
+        ("A4", 1),
+        ("A4", 1),
+        ("G4", 1),
+        ("G4", 2),
+        ("G4", 1),
+        ("E4", 1),
+        ("E4", 1),
+        ("D4", 1),
+        ("E4", 1),
+        ("G4", 1),
+        ("G4", 2),
+        ("A4", 1),
+        ("A4", 1),
+        ("G4", 1),
+        ("C4", 1),
+        ("E4", 1),
+        ("D4", 1),
+        ("C4", 2),
+        ("G4", 2),
+        ("E4", 1),
+        ("G4", 1),
+        ("A4", 1),
+        ("C5", 3),
+        ("G4", 2),
+        ("E4", 1),
+        ("C4", 1),
+        ("E4", 1),
+        ("D4", 3),
+        ("G4", 2),
+        ("E4", 1),
+        ("G4", 1),
+        ("A4", 1),
+        ("C5", 2),
+        ("A4", 1),
+        ("G4", 1),
+        ("C4", 1),
+        ("E4", 1),
+        ("D4", 1),
+        ("C4", 4),
+    ]
     weights = {
-        "chord_melody_congruence": 0.4,
-        "note_variety": 0.1,
-        "melodic_flow": 0.3,
+        "chord_melody_congruence": 0.5,
+        "note_variety": 0.15,
+        "melodic_flow": 0.35,
     }
     chord_mappings = {
         "C": ["C", "E", "G"],
@@ -553,6 +551,9 @@ def main():
         "Bdim": ["B", "D", "F"]
     }
     notes = [
+        ("G4", 1),
+        ("A4", 1),
+        ("B4", 1),
         ("C5", 1),
         # ("C5", 2),
         # ("C5", 3),
@@ -578,13 +579,11 @@ def main():
         # ("C6", 2),
         # ("C6", 3),
         # ("C6", 4),
-        ("D6", 1),
-        # ("D6", 2),
-        ("E6", 1),
-        # ("E6", 2),
-        # ("E6", 4),
     ]
     preferred_transitions = {
+        "G4": ["A4", "B4", "C4"],
+        "A4": ["G4", "B4", "C5", "D5"],
+        "B4": ["G4", "A4", "C5", "D5"],
         "C5": ["C5", "D5", "E5", "G5", "A5"],
         "D5": ["C5", "E5", "F5"],
         "E5": ["C5", "D5", "F5", "G5"],
@@ -593,8 +592,6 @@ def main():
         "A5": ["C5", "D5", "F5", "G5", "B5", "C6", "D6"],
         "B5": ["G5", "A5", "C6", "D6"],
         "C6": ["G5", "B5", "C6", "D6", "E6"],
-        "D6": ["C6", "E6"],
-        "E6": ["C6", "D6"],
     }
 
     # Instantiate objects for generating harmonization
@@ -619,7 +616,7 @@ def main():
 
     # Render to music21 score and show it
     music21_score = create_score(
-        generated_descant, jesus_loves_me_chords, chord_mappings
+        generated_descant, jesus_loves_me_melody, jesus_loves_me_chords, chord_mappings
     )
     music21_score.show()
 
