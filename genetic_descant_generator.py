@@ -4,12 +4,11 @@ from dataclasses import dataclass
 import music21
 
 # TODO list:
-# 1. Make it work with other durations of notes besides quarter notes
-# 2. Allow input of melody along with chords
-# 3. Add more evaluation functions
+# 1. All durations other than quarter in generated descant
+# 2. Add more evaluation functions
 #    - congruence and variety between melody and descant
-#    - harmonic functionality of descant
-# 4. Make it work with different key and time signatures
+#    - rhythmic variety of descant
+# 4. Allow different key and time signatures
 # 5. Allow input of XML file with melody and chord voicings
 #    - congruence of descant with each voice
 
@@ -255,10 +254,11 @@ class GeneticDescantGenerator:
 
 class FitnessEvaluator:
     """
-    Evaluates the fitness of a chord sequence based on various musical criteria.
+    Evaluates the fitness of a note sequence based on various musical criteria.
 
     Attributes:
         chords (list): List of tuples representing chords as (chord symbol, duration).
+        melody (list): List of tuples representing melody notes as (note name, duration).
         chord_mappings (dict): Dictionary of chords with their corresponding notes.
         notes (list): List of available notes for the descant.
         weights (dict): Weights for different fitness evaluation functions.
@@ -266,20 +266,22 @@ class FitnessEvaluator:
     """
 
     def __init__(
-        self, chord_data, chord_mappings, notes, weights, preferred_transitions
+        self, chord_data, melody_data, chord_mappings, notes, weights, preferred_transitions
     ):
         """
-        Initialize the FitnessEvaluator with accompaniment, chord mappings, notes,
-        weights, and preferred transitions.
+        Initialize the FitnessEvaluator with accompaniment, melody, chord mappings,
+        notes, weights, and preferred transitions.
 
         Parameters:
             chord_data (ChordData): Accompaniment information.
+            melody_data (MelodyData): Melody information.
             chord_mappings (dict): Available chords mapped to their notes.
             notes (list): Available notes for the descant.
             weights (dict): Weights for each fitness evaluation function.
             preferred_transitions (dict): Preferred transitions between notes.
         """
         self.chord_data = chord_data
+        self.melody_data = melody_data
         self.chord_mappings = chord_mappings
         self.notes = notes
         self.weights = weights
@@ -312,14 +314,14 @@ class FitnessEvaluator:
             for func in self.weights
         )
 
-    def _chord_melody_congruence(self, note_sequence):
+    def _chord_descant_congruence(self, note_sequence):
         """
-        Calculates the congruence between the chord sequence and the melody.
+        Calculates the congruence between the chord sequence and the descant.
         This function assesses how well each chord in the sequence aligns
         with the corresponding segment of the melody. The alignment is
-        measured by checking if the notes in the melody are present in the
+        measured by checking if the notes in the descant are present in the
         chords being played at the same time, rewarding sequences where the
-        melody notes fit well with the chords.
+        descant notes fit well with the chords.
 
         Parameters:
             note_sequence (list): A list of notes to be evaluated against the
@@ -327,19 +329,33 @@ class FitnessEvaluator:
 
         Returns:
             float: A score representing the degree of congruence between the
-                chord sequence and the melody, normalized by the melody's
+                chord sequence and the descant, normalized by the descant's
                 duration.
         """
-        score, melody_index = 0, 0
+        score, descant_index = 0, 0
         for chord in self.chord_data.chords:
             bar_duration = 0
-            while bar_duration < 4 and melody_index < len(note_sequence):
-                pitch, duration = note_sequence[melody_index]
+            while bar_duration < 4 and descant_index < len(note_sequence):
+                pitch, duration = note_sequence[descant_index]
                 if pitch[0] in self.chord_mappings[chord[0]]:
                     score += duration
                 bar_duration += duration
-                melody_index += 1
+                descant_index += 1
         return score / self.chord_data.duration
+    
+    def _counterpoint(self, note_sequence):
+        """
+        Measures the quality of counterpoint between the descant and the melody.
+
+        Parameters:
+            note_sequence (list): A list of notes to be evaluated against the
+                melody.
+
+        Returns:
+            float: A score representing the degree of congruence between the
+                melody and the descant, normalized by the duration.
+        """
+        pass
 
     def _note_variety(self, note_sequence):
         """
@@ -360,9 +376,9 @@ class FitnessEvaluator:
         total_notes = len(self.notes)
         return unique_notes / total_notes
 
-    def _melodic_flow(self, note_sequence):
+    def _voice_leading(self, note_sequence):
         """
-        Assesses the melodic flow of the note sequence by examining the
+        Assesses the voice leading of the note sequence by examining the
         transitions between successive notes. This function scores the
         sequence based on how frequently the note transitions align with
         predefined preferred transitions. Smooth and musically pleasant
@@ -377,38 +393,35 @@ class FitnessEvaluator:
         """
         score = 0
         for i in range(len(note_sequence) - 1):
-            next_note = note_sequence[i + 1]
+            next_note = note_sequence[i + 1][0]
             if next_note in self.preferred_transitions[note_sequence[i][0]]:
                 score += 1
         return score / (len(note_sequence) - 1)
 
-    # def _functional_harmony(self, chord_sequence):
-    #     """
-    #     Evaluates the chord sequence based on principles of functional harmony.
-    #     This function checks for the presence of key harmonic functions such as
-    #     the tonic at the beginning and end of the sequence and the presence of
-    #     subdominant and dominant chords. Adherence to these harmonic
-    #     conventions is rewarded with a higher score.
+    def _functional_harmony(self, note_sequence):
+        """
+        Evaluates the note sequence based on principles of functional harmony.
+        This function checks for the presence of key harmonic functions such as
+        notes from the tonic chord at the beginning and end of the sequence.
+        Adherence to these harmonic conventions is rewarded with a higher score.
 
-    #     Parameters:
-    #         chord_sequence (list): The chord sequence to evaluate.
+        Parameters:
+            note_sequence (list): The note sequence to evaluate.
 
-    #     Returns:
-    #         float: A score representing the extent to which the sequence
-    #             adheres to traditional functional harmony, normalized by
-    #             the number of checks performed.
-    #     """
-    #     score = 0
-    #     if chord_sequence[0] in ["C", "Am"]:
-    #         score += 1
-    #     if chord_sequence[-1] in ["C"]:
-    #         score += 1
-    #     if "F" in chord_sequence and "G" in chord_sequence:
-    #         score += 1
-    #     return score / 3
+        Returns:
+            float: A score representing the extent to which the sequence
+                adheres to traditional functional harmony, normalized by
+                the number of checks performed.
+        """
+        score = 0
+        if note_sequence[0][0][0] in ["C", "E", "G"]:
+            score += 1
+        if note_sequence[-1][0][0] in ["C", "E", "G"]:
+            score += 1
+        return score / 2
 
 
-def create_score(descant, melody, chord_sequence, chord_mappings):
+def create_score(descant, melody, chord_sequence, chord_mappings, instrument="Violin"):
     """
     Create a music21 score with a given descant, melody, and chord sequence.
 
@@ -420,6 +433,7 @@ def create_score(descant, melody, chord_sequence, chord_mappings):
         chord_sequence (list): A list of tuples representing chords
             in the format (chord_symbol, duration).
         chord_mappings (dict): Available chords mapped to their notes.
+        instrument (str): The instrument to use for the descant.
 
     Returns:
         music21.stream.Score: A music score containing the descant and chord
@@ -430,12 +444,14 @@ def create_score(descant, melody, chord_sequence, chord_mappings):
 
     # Create the descant part and add notes to it
     descant_part = music21.stream.Part()
+    descant_part.append(music21.instrument.fromString(instrument))
     for note_name, duration in descant:
         descant_note = music21.note.Note(note_name, quarterLength=duration)
         descant_part.append(descant_note)
 
     # Create the melody part and add notes to it
     melody_part = music21.stream.Part()
+    melody_part.append(music21.instrument.Vocalist())
     for note_name, duration in melody:
         melody_note = music21.note.Note(note_name, quarterLength=duration)
         melody_part.append(melody_note)
@@ -537,9 +553,10 @@ def main():
         ("C4", 4),
     ]
     weights = {
-        "chord_melody_congruence": 0.5,
-        "note_variety": 0.15,
-        "melodic_flow": 0.35,
+        "chord_descant_congruence": 0.5,
+        "note_variety": 0.1,
+        "voice_leading": 0.2,
+        "functional_harmony": 0.2,
     }
     chord_mappings = {
         "C": ["C", "E", "G"],
@@ -550,62 +567,77 @@ def main():
         "Am": ["A", "C", "E"],
         "Bdim": ["B", "D", "F"]
     }
-    notes = [
+    violin_notes = [
+        ("C4", 1),
+        ("D4", 1),
+        ("E4", 1),
+        ("F4", 1),
         ("G4", 1),
         ("A4", 1),
         ("B4", 1),
         ("C5", 1),
-        # ("C5", 2),
-        # ("C5", 3),
-        # ("C5", 4),
         ("D5", 1),
-        # ("D5", 2),
         ("E5", 1),
-        # ("E5", 2),
-        # ("E5", 4),
         ("F5", 1),
-        # ("F5", 2),
         ("G5", 1),
-        # ("G5", 2),
-        # ("G5", 3),
-        # ("G5", 4),
         ("A5", 1),
-        # ("A5", 2),
-        # ("A5", 3),
-        # ("A5", 4),
         ("B5", 1),
-        # ("B5", 2),
-        ("C6", 1),
-        # ("C6", 2),
-        # ("C6", 3),
-        # ("C6", 4),
+        ("C6", 1)
+    ]
+    viola_notes = [
+        ("G3", 1),
+        ("A3", 1),
+        ("B3", 1),
+        ("C4", 1),
+        ("D4", 1),
+        ("E4", 1),
+        ("F4", 1),
+        ("G4", 1),
+        ("A4", 1),
+        ("B4", 1),
+        ("C5", 1),
+        ("D5", 1),
+        ("E5", 1),
+        ("F5", 1),
+        ("G5", 1),
+        ("A5", 1),
     ]
     preferred_transitions = {
-        "G4": ["A4", "B4", "C4"],
+        "G3": ["A3", "B3", "C4", "D4"],
+        "A3": ["G3", "B3", "C4", "D4"],
+        "B3": ["G3", "A3", "C4", "D4"],
+        "C4": ["G3", "A3", "B3", "C4", "D4", "E4", "G4", "A4"],
+        "D4": ["C4", "E4", "F4", "A4"],
+        "E4": ["C4", "D4", "F4", "G4"],
+        "F4": ["D4", "E4", "G4", "A4"],
+        "G4": ["C4", "A4", "B4", "C5"],
         "A4": ["G4", "B4", "C5", "D5"],
         "B4": ["G4", "A4", "C5", "D5"],
-        "C5": ["C5", "D5", "E5", "G5", "A5"],
+        "C5": ["G4", "A4", "B4", "C5", "D5", "E5", "G5", "A5"],
         "D5": ["C5", "E5", "F5"],
         "E5": ["C5", "D5", "F5", "G5"],
         "F5": ["D5", "E5", "G5", "A5"],
         "G5": ["C5", "E5", "F5", "G5", "A5", "B5", "C6"],
         "A5": ["C5", "D5", "F5", "G5", "B5", "C6", "D6"],
         "B5": ["G5", "A5", "C6", "D6"],
-        "C6": ["G5", "B5", "C6", "D6", "E6"],
+        "C6": ["C5", "G5", "A5", "B5", "C6"],
     }
 
     # Instantiate objects for generating harmonization
     chord_data = ChordData(jesus_loves_me_chords)
+    melody_data = MelodyData(jesus_loves_me_melody)
+    assert chord_data.duration == melody_data.duration, "Chord and melody durations must match"
     fitness_evaluator = FitnessEvaluator(
         chord_data=chord_data,
+        melody_data=melody_data,
         chord_mappings=chord_mappings,
-        notes=notes,
+        notes=violin_notes,
         weights=weights,
         preferred_transitions=preferred_transitions,
     )
     generator = GeneticDescantGenerator(
         chord_data=chord_data,
-        notes=notes,
+        notes=violin_notes,
         population_size=100,
         mutation_rate=0.05,
         fitness_evaluator=fitness_evaluator,
