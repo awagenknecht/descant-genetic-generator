@@ -6,7 +6,6 @@ import music21
 # TODO list:
 # 1. All durations other than quarter in generated descant
 # 2. Add more evaluation functions
-#    - congruence and variety between melody and descant
 #    - rhythmic variety of descant
 # 4. Allow different key and time signatures
 # 5. Allow input of XML file with melody and chord voicings
@@ -134,7 +133,9 @@ class GeneticDescantGenerator:
                 found in the last generation.
         """
         self._population = self._initialise_population()
-        for _ in range(generations):
+        for x in range(generations):
+            if (x + 1) % 100 == 0:
+                print(f"Generation {x + 1} out of {generations}")
             parents = self._select_parents()
             new_population = self._create_new_population(parents)
             self._population = new_population
@@ -346,6 +347,8 @@ class FitnessEvaluator:
     def _counterpoint(self, note_sequence):
         """
         Measures the quality of counterpoint between the descant and the melody.
+        Rewards consonances and penalizes dissonances.
+        Rewards resolution of dissonances on the following beat.
 
         Parameters:
             note_sequence (list): A list of notes to be evaluated against the
@@ -355,7 +358,51 @@ class FitnessEvaluator:
             float: A score representing the degree of congruence between the
                 melody and the descant, normalized by the duration.
         """
-        pass
+        score = 0
+        melody_index, descant_index = 0, 0
+        melody_time, descant_time = 0, 0
+        previous_dissonant = False
+
+        # Progress through the melody and descant by quarter note beats
+        while (melody_index < len(self.melody_data.notes)
+               and descant_index < len(note_sequence)):
+            melody_note, melody_duration = self.melody_data.notes[melody_index]
+            descant_note, descant_duration = note_sequence[descant_index]
+
+            # Find the interval between the current melody and descant notes
+            melody_pitch = music21.pitch.Pitch(melody_note)
+            descant_pitch = music21.pitch.Pitch(descant_note)
+            interval = music21.interval.Interval(melody_pitch, descant_pitch)
+
+            # Check if the interval is consonant or dissonant
+            if interval.isConsonant():
+                score += 1 # Consonant intervals are preferred
+                if previous_dissonant:
+                    score += 2 # Reward resolution of dissonance
+            else:
+                previous_dissonant = True
+                score -= 1 # Penalize dissonant intervals
+            
+            # Update the indices and durations
+            # If the descant note ends before the melody note,
+            # move to the next descant note
+            if descant_time + descant_duration < melody_time + melody_duration:
+                descant_time += descant_duration
+                descant_index += 1
+            # If the notes end together, advance both indices
+            elif descant_time + descant_duration == melody_time + melody_duration:
+                descant_time += descant_duration
+                descant_index += 1
+                melody_time += melody_duration
+                melody_index += 1
+            # If the melody note ends before the descant note,
+            # move to the next melody note
+            else:
+                melody_time += melody_duration
+                melody_index += 1
+        
+        return score / self.melody_data.duration # Normalize by total duration
+
 
     def _note_variety(self, note_sequence):
         """
@@ -553,10 +600,11 @@ def main():
         ("C4", 4),
     ]
     weights = {
-        "chord_descant_congruence": 0.5,
+        "chord_descant_congruence": 0.4,
         "note_variety": 0.1,
-        "voice_leading": 0.2,
+        "voice_leading": 0.1,
         "functional_harmony": 0.2,
+        "counterpoint": 0.2
     }
     chord_mappings = {
         "C": ["C", "E", "G"],
