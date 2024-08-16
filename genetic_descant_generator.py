@@ -4,11 +4,11 @@ from dataclasses import dataclass
 import music21
 
 # TODO list:
-# 1. All durations other than quarter in generated descant
-# 2. Add more evaluation functions
-#    - rhythmic variety of descant
-# 4. Allow different key and time signatures
-# 5. Allow input of XML file with melody and chord voicings
+# 1. Revise evaluation functions
+#    - more complex assessment of rhythmic variety of descant
+#    - improve speed of counterpoint evaluation
+# 2. Allow different key and time signatures
+# 3. Allow input of XML file with melody and chord voicings
 #    - congruence of descant with each voice
 
 
@@ -234,8 +234,31 @@ class GeneticDescantGenerator:
         Returns:
             list: Resulting child note sequence.
         """
-        cut_index = random.randint(1, len(parent1) - 1)
-        return parent1[:cut_index] + parent2[cut_index:]
+        total_duration = 0 # Track total duration of child sequence
+        child = [] # Store child sequence
+
+        # Continue until the total duration is met
+        while total_duration < self.chord_data.duration:
+            # Randomly select a cut index for crossover,
+            # ensuring it doesn't exceed either parent's length
+            cut_index = random.randint(1, min(len(parent1), len(parent2)) - 1)
+            segment = parent1[:cut_index] + parent2[cut_index:]
+            segment_duration = sum(duration for _, duration in segment)
+
+            if total_duration + segment_duration > self.chord_data.duration:
+                # Adjust the last note's duration if it exceeds the total duration
+                for note, duration in segment:
+                    if total_duration + duration > self.chord_data.duration:
+                        duration = self.chord_data.duration - total_duration
+                    child.append((note, duration))
+                    total_duration += duration
+                    if total_duration >= self.chord_data.duration:
+                        break
+            else:
+                child.extend(segment)
+                total_duration += segment_duration
+
+        return child
 
     def _mutate(self, note_sequence):
         """
@@ -403,7 +426,6 @@ class FitnessEvaluator:
         
         return score / self.melody_data.duration # Normalize by total duration
 
-
     def _note_variety(self, note_sequence):
         """
         Evaluates the diversity of notes used in the sequence. This function
@@ -422,6 +444,24 @@ class FitnessEvaluator:
         unique_notes = len(set(note_sequence))
         total_notes = len(self.notes)
         return unique_notes / total_notes
+    
+    def _rhythmic_variety(self, note_sequence):
+        """
+        Evaluates the diversity of rhythms used in the sequence. This function
+        calculates a score based on the number of unique rhythms present in the
+        sequence. Higher variety in the note sequence results in a higher score,
+        promoting musical complexity and interest.
+
+        Parameters:
+            note_sequence (list): The note sequence to evaluate.
+
+        Returns:
+            float: A normalized score representing the variety of rhythms in the
+                sequence.
+        """
+        unique_rhythms = len(set(duration for _, duration in note_sequence))
+        total_rhythms = len(set(duration for _, duration in self.notes))
+        return unique_rhythms / total_rhythms
 
     def _voice_leading(self, note_sequence):
         """
@@ -468,7 +508,7 @@ class FitnessEvaluator:
         return score / 2
 
 
-def create_score(descant, melody, chord_sequence, chord_mappings, instrument="Violin"):
+def create_score(descant, melody, chord_sequence, chord_mappings, instrument="violin"):
     """
     Create a music21 score with a given descant, melody, and chord sequence.
 
@@ -492,6 +532,8 @@ def create_score(descant, melody, chord_sequence, chord_mappings, instrument="Vi
     # Create the descant part and add notes to it
     descant_part = music21.stream.Part()
     descant_part.append(music21.instrument.fromString(instrument))
+    clef = music21.clef.TrebleClef() if instrument == "violin" else music21.clef.AltoClef()
+    descant_part.append(clef)
     for note_name, duration in descant:
         descant_note = music21.note.Note(note_name, quarterLength=duration)
         descant_part.append(descant_note)
@@ -600,12 +642,14 @@ def main():
         ("C4", 4),
     ]
     weights = {
-        "chord_descant_congruence": 0.4,
+        "chord_descant_congruence": 0.1,
         "note_variety": 0.1,
-        "voice_leading": 0.1,
-        "functional_harmony": 0.2,
-        "counterpoint": 0.2
+        "rhythmic_variety": 0.1,
+        "voice_leading": 0.5,
+        "functional_harmony": 0.05,
+        "counterpoint": 0.15
     }
+    assert sum(weights.values()) == 1, "Weights must sum to 1"
     chord_mappings = {
         "C": ["C", "E", "G"],
         "Dm": ["D", "F", "A"],
@@ -616,39 +660,70 @@ def main():
         "Bdim": ["B", "D", "F"]
     }
     violin_notes = [
-        ("C4", 1),
-        ("D4", 1),
+        # ("C4", 1),
+        # ("D4", 1),
         ("E4", 1),
+        ("E4", 2),
+        ("E4", 3),
         ("F4", 1),
+        ("F4", 2),
         ("G4", 1),
+        ("G4", 2),
+        ("G4", 3),
+        ("G4", 4),
         ("A4", 1),
+        ("A4", 2),
         ("B4", 1),
+        ("B4", 2),
         ("C5", 1),
+        ("C5", 2),
+        ("C5", 3),
+        ("C5", 4),
         ("D5", 1),
+        ("D5", 2),
         ("E5", 1),
+        ("E5", 2),
         ("F5", 1),
+        ("F5", 2),
         ("G5", 1),
-        ("A5", 1),
-        ("B5", 1),
-        ("C6", 1)
+        ("G5", 2)
+        # ("A5", 1),
+        # ("B5", 1),
+        # ("C6", 1)
     ]
     viola_notes = [
-        ("G3", 1),
-        ("A3", 1),
-        ("B3", 1),
+        # ("G3", 1),
+        # ("A3", 1),
+        # ("B3", 1),
         ("C4", 1),
+        ("C4", 2),
+        ("C4", 3),
+        ("C4", 4),
         ("D4", 1),
+        ("D4", 2),
         ("E4", 1),
+        ("E4", 2),
+        ("E4", 3),
         ("F4", 1),
+        ("F4", 2),
         ("G4", 1),
+        ("G4", 2),
+        ("G4", 3),
         ("A4", 1),
+        ("A4", 2),
         ("B4", 1),
+        ("B4", 2),
         ("C5", 1),
+        ("C5", 2),
+        ("C5", 3),
+        ("C5", 4),
         ("D5", 1),
+        ("D5", 2),
         ("E5", 1),
-        ("F5", 1),
-        ("G5", 1),
-        ("A5", 1),
+        ("E5", 2)
+        # ("F5", 1),
+        # ("G5", 1),
+        # ("A5", 1),
     ]
     preferred_transitions = {
         "G3": ["A3", "B3", "C4", "D4"],
@@ -671,6 +746,10 @@ def main():
         "C6": ["C5", "G5", "A5", "B5", "C6"],
     }
 
+    # Choose Violin or Viola
+    instrument = "viola"
+    # instrument = "violin"
+
     # Instantiate objects for generating harmonization
     chord_data = ChordData(jesus_loves_me_chords)
     melody_data = MelodyData(jesus_loves_me_melody)
@@ -679,13 +758,13 @@ def main():
         chord_data=chord_data,
         melody_data=melody_data,
         chord_mappings=chord_mappings,
-        notes=violin_notes,
+        notes=violin_notes if instrument == "violin" else viola_notes,
         weights=weights,
         preferred_transitions=preferred_transitions,
     )
     generator = GeneticDescantGenerator(
         chord_data=chord_data,
-        notes=violin_notes,
+        notes=violin_notes if instrument == "violin" else viola_notes,
         population_size=100,
         mutation_rate=0.05,
         fitness_evaluator=fitness_evaluator,
@@ -696,7 +775,8 @@ def main():
 
     # Render to music21 score and show it
     music21_score = create_score(
-        generated_descant, jesus_loves_me_melody, jesus_loves_me_chords, chord_mappings
+        generated_descant, jesus_loves_me_melody, jesus_loves_me_chords,
+        chord_mappings, instrument=instrument
     )
     music21_score.show()
 
