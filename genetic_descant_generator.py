@@ -769,8 +769,8 @@ def main():
     }
 
     # Choose Violin or Viola
-    instrument = "viola"
-    # instrument = "violin"
+    # instrument = "viola"
+    instrument = "violin"
 
     # Instantiate objects for generating harmonization
     chord_data = ChordData(jesus_loves_me_chords)
