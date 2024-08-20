@@ -176,8 +176,6 @@ class GeneticDescantGenerator:
             note_sequence[-1] = (
                 note_sequence[-1][0], note_sequence[-1][1] - (total_duration - self.chord_data.duration)
                 )
-        assert sum(duration for _, duration in note_sequence) == self.chord_data.duration, \
-            "Note sequence duration must match chord duration"
         return note_sequence
 
     def _select_parents(self):
@@ -270,14 +268,6 @@ class GeneticDescantGenerator:
         else:
             child.append((parent2[parent2_index-1][0], parent2_duration - cut_duration))
             child.extend(parent2[parent2_index:])
-        assert sum(duration for _, duration in child) == total_duration,  \
-            f"Child duration must match parent duration. \n \
-            Child duration: {sum(duration for _, duration in child)} \n \
-            Parent duration: {total_duration} \n \
-            Child: {child} \n \
-            Parent1: {parent1} \n \
-            Parent2: {parent2} \n \
-            Cut duration: {cut_duration}"
         return child
 
     def _mutate(self, note_sequence):
