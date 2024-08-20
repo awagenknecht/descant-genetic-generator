@@ -166,10 +166,19 @@ class GeneticDescantGenerator:
         Returns:
             list: List of randomly generated notes.
         """
-        return [
-            random.choice(self.notes)
-            for _ in range(self.chord_data.duration)
-        ]
+        note_sequence = []
+        total_duration = 0
+        while total_duration < self.chord_data.duration:
+            note = random.choice(self.notes)
+            total_duration += note[1]
+            note_sequence.append(note)
+        if total_duration > self.chord_data.duration:
+            note_sequence[-1] = (
+                note_sequence[-1][0], note_sequence[-1][1] - (total_duration - self.chord_data.duration)
+                )
+        assert sum(duration for _, duration in note_sequence) == self.chord_data.duration, \
+            "Note sequence duration must match chord duration"
+        return note_sequence
 
     def _select_parents(self):
         """
@@ -234,30 +243,41 @@ class GeneticDescantGenerator:
         Returns:
             list: Resulting child note sequence.
         """
-        total_duration = 0 # Track total duration of child sequence
-        child = [] # Store child sequence
-
-        # Continue until the total duration is met
-        while total_duration < self.chord_data.duration:
-            # Randomly select a cut index for crossover,
-            # ensuring it doesn't exceed either parent's length
-            cut_index = random.randint(1, min(len(parent1), len(parent2)) - 1)
-            segment = parent1[:cut_index] + parent2[cut_index:]
-            segment_duration = sum(duration for _, duration in segment)
-
-            if total_duration + segment_duration > self.chord_data.duration:
-                # Adjust the last note's duration if it exceeds the total duration
-                for note, duration in segment:
-                    if total_duration + duration > self.chord_data.duration:
-                        duration = self.chord_data.duration - total_duration
-                    child.append((note, duration))
-                    total_duration += duration
-                    if total_duration >= self.chord_data.duration:
-                        break
-            else:
-                child.extend(segment)
-                total_duration += segment_duration
-
+        child = []
+        total_duration = self.chord_data.duration
+        cut_duration = random.randint(1, total_duration - 1)
+        # Count duration in parent 1 until cut_duration is reached
+        parent1_duration = 0
+        parent1_index = 0
+        while parent1_duration < cut_duration:
+            parent1_duration += parent1[parent1_index][1]
+            parent1_index += 1
+        # Extend parent1 notes to child and cap at cut_duration
+        child.extend(parent1[:parent1_index])
+        child_duration = sum(duration for _, duration in child)
+        if child_duration > cut_duration:
+            # Pitch of last note stays the same, duration decreased by the amount exceeding cut_duration
+            child[-1] = (child[-1][0], child[-1][1] - (child_duration - cut_duration))
+        # Count duration in parent 2 until cut_duration is reached
+        parent2_duration = 0
+        parent2_index = 0
+        while parent2_duration < cut_duration:
+            parent2_duration += parent2[parent2_index][1]
+            parent2_index += 1
+        # Extend parent2 notes to child and cap at total_duration
+        if parent2_duration == cut_duration:
+            child.extend(parent2[parent2_index:])
+        else:
+            child.append((parent2[parent2_index-1][0], parent2_duration - cut_duration))
+            child.extend(parent2[parent2_index:])
+        assert sum(duration for _, duration in child) == total_duration,  \
+            f"Child duration must match parent duration. \n \
+            Child duration: {sum(duration for _, duration in child)} \n \
+            Parent duration: {total_duration} \n \
+            Child: {child} \n \
+            Parent1: {parent1} \n \
+            Parent2: {parent2} \n \
+            Cut duration: {cut_duration}"
         return child
 
     def _mutate(self, note_sequence):
@@ -272,7 +292,9 @@ class GeneticDescantGenerator:
         """
         if random.random() < self.mutation_rate:
             mutation_index = random.randint(0, len(note_sequence) - 1)
-            note_sequence[mutation_index] = random.choice(self.notes)
+            note_sequence[mutation_index] = (
+                random.choice(self.notes)[0], note_sequence[mutation_index][1]
+            )
         return note_sequence
 
 
@@ -747,8 +769,8 @@ def main():
     }
 
     # Choose Violin or Viola
-    instrument = "viola"
-    # instrument = "violin"
+    # instrument = "viola"
+    instrument = "violin"
 
     # Instantiate objects for generating harmonization
     chord_data = ChordData(jesus_loves_me_chords)
