@@ -18,7 +18,7 @@ class TestChordData(unittest.TestCase):
 
 class TestGeneticDescantGenerator(unittest.TestCase):
     def setUp(self):
-        self.chords = [("C", 4), ("D", 4), ("G", 4), ("C", 4)]
+        self.chords = [("C", 4), ("Dm", 4), ("G", 4), ("C", 4)]
         self.chord_data = ChordData(chords=self.chords)
         self.notes = [("C4", 1), ("C4", 2), ("C4", 3), ("C4", 4), 
                       ("D4", 1), ("D4", 2), ("D4", 3), ("D4", 4),
@@ -120,6 +120,10 @@ class TestGeneticDescantGenerator(unittest.TestCase):
         self.assertEqual(
             crossover_sequence, [("C4", 1), ("D4", 1), ("C5", 2), ("G4", 4), ("A4", 4), ("F4", 4)]
             )
+
+    def test_generate(self):
+        descant = self.generator.generate(1)
+        self.assertEqual(sum(duration for _, duration in descant), 16)
 
 class TestFitnessEvaluator(unittest.TestCase):
     def test_chord_descant_congruence(self):
