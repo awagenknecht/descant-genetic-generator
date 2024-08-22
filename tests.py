@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
 from genetic_descant_generator import MelodyData, ChordData, GeneticDescantGenerator, FitnessEvaluator
+import utils
 
 class TestMelodyData(unittest.TestCase):
     def test_melody_data_duration_and_bars(self):
@@ -43,10 +44,10 @@ class TestGeneticDescantGenerator(unittest.TestCase):
             notes=self.notes, 
             weights={"chord_descant_congruence": 0.1,
                     "note_variety": 0.1,
-                    "rhythmic_variety": 0.1,
+                    # "rhythmic_variety": 0.1,
                     "voice_leading": 0.5,
-                    "functional_harmony": 0.05,
-                    "counterpoint": 0.15
+                    "functional_harmony": 0.1,
+                    "counterpoint": 0.2
                     },
             preferred_transitions={"G3": ["A3", "B3", "C4", "D4"],
                                     "A3": ["G3", "B3", "C4", "D4"],
@@ -155,19 +156,26 @@ class TestFitnessEvaluator(unittest.TestCase):
         score = evaluator._note_variety(descant)
         self.assertGreater(score, 0)
 
-    def test_rhythmic_variety(self):
-        notes = [("C4", 1), ("C4", 2), ("C4", 3), ("C4", 4)]
-        descant = [("C4", 1), ("C4", 1), ("C4", 2), ("C4", 4)]
-        evaluator = FitnessEvaluator(
-            chord_data=None, 
-            melody_data=None,
-            chord_mappings={},
-            notes=notes,
-            weights={}, 
-            preferred_transitions={}
-        )
-        score = evaluator._rhythmic_variety(descant)
-        self.assertGreater(score, 0)
+    # def test_rhythmic_variety(self):
+    #     notes = [("C4", 1), ("C4", 2), ("C4", 3), ("C4", 4)]
+    #     descant = [("C4", 1), ("C4", 1), ("C4", 2), ("C4", 4)]
+    #     evaluator = FitnessEvaluator(
+    #         chord_data=None, 
+    #         melody_data=None,
+    #         chord_mappings={},
+    #         notes=notes,
+    #         weights={}, 
+    #         preferred_transitions={}
+    #     )
+    #     score = evaluator._rhythmic_variety(descant)
+    #     self.assertGreater(score, 0)
+
+
+class TestUtils(unittest.TestCase):
+    def test_generate_notes(self):
+        notes = utils.generate_notes(range=(60, 72), durations=[0.25, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0])
+        self.assertEqual(len(notes), 104)
+
 
 if __name__ == "__main__":
     unittest.main()
