@@ -43,11 +43,11 @@ class TestGeneticDescantGenerator(unittest.TestCase):
                             },
             notes=self.notes, 
             weights={"chord_descant_congruence": 0.1,
-                    "note_variety": 0.1,
-                    # "rhythmic_variety": 0.1,
+                    "pitch_variety": 0.1,
+                    "rhythmic_variety": 0.1,
                     "voice_leading": 0.5,
                     "functional_harmony": 0.1,
-                    "counterpoint": 0.2
+                    "counterpoint": 0.1
                     },
             preferred_transitions={"G3": ["A3", "B3", "C4", "D4"],
                                     "A3": ["G3", "B3", "C4", "D4"],
@@ -141,10 +141,11 @@ class TestFitnessEvaluator(unittest.TestCase):
         )
         score = evaluator._chord_descant_congruence(descant)
         self.assertGreater(score, 0)
+        self.assertGreater(1, score)
     
-    def test_note_variety(self):
-        notes = [("C4", 1), ("D4", 1), ("E4", 1), ("F4", 1), ("G4", 1)]
-        descant = [("C4", 1), ("G4", 1), ("E4", 1), ("D4", 1)]
+    def test_pitch_variety(self):
+        notes = [("C4", 1), ("D4", 1), ("E4", 1), ("G4", 1)]
+        descant = [("C4", 1), ("C4", 1), ("G4", 1), ("G4", 1)]
         evaluator = FitnessEvaluator(
             chord_data=None, 
             melody_data=None,
@@ -153,28 +154,94 @@ class TestFitnessEvaluator(unittest.TestCase):
             weights={}, 
             preferred_transitions={}
         )
-        score = evaluator._note_variety(descant)
-        self.assertGreater(score, 0)
+        score = evaluator._pitch_variety(descant)
+        self.assertEqual(score, 0.5)
 
-    # def test_rhythmic_variety(self):
-    #     notes = [("C4", 1), ("C4", 2), ("C4", 3), ("C4", 4)]
-    #     descant = [("C4", 1), ("C4", 1), ("C4", 2), ("C4", 4)]
-    #     evaluator = FitnessEvaluator(
-    #         chord_data=None, 
-    #         melody_data=None,
-    #         chord_mappings={},
-    #         notes=notes,
-    #         weights={}, 
-    #         preferred_transitions={}
-    #     )
-    #     score = evaluator._rhythmic_variety(descant)
-    #     self.assertGreater(score, 0)
+    def test_rhythmic_variety(self):
+        notes = [("C4", 1), ("C4", 2), ("C4", 3), ("C4", 4)]
+        descant = [("C4", 1), ("C4", 1), ("C4", 2), ("C4", 2)]
+        evaluator = FitnessEvaluator(
+            chord_data=None, 
+            melody_data=None,
+            chord_mappings={},
+            notes=notes,
+            weights={}, 
+            preferred_transitions={}
+        )
+        score = evaluator._rhythmic_variety(descant)
+        self.assertEqual(score, 0.5)
+
+    def test_voice_leading(self):
+        notes = [("C4", 1), ("D4", 1), ("E4", 1), ("F4", 1)]
+        descant = [("C4", 1), ("D4", 1), ("E4", 1), ("F4", 1)]
+        evaluator = FitnessEvaluator(
+            chord_data=None, 
+            melody_data=None,
+            chord_mappings={},
+            notes=notes,
+            weights={}, 
+            preferred_transitions={"C4":"D4", "D4":"E4", "E4":"F4"}
+        )
+        score = evaluator._voice_leading(descant)
+        self.assertEqual(score, 1)
+
+    def test_functional_harmony(self):
+        notes = [("C4", 1), ("D4", 1), ("E4", 1), ("F4", 1)]
+        descant = [("C4", 1), ("D4", 1), ("E4", 1), ("G4", 1)]
+        evaluator = FitnessEvaluator(
+            chord_data=None, 
+            melody_data=None,
+            chord_mappings={"C": ["C", "E", "G"], "Dm": ["D", "F", "A"], "Em": ["E", "G", "B"], "F": ["F", "A", "C"]},
+            notes=notes,
+            weights={}, 
+            preferred_transitions={}
+        )
+        score = evaluator._functional_harmony(descant)
+        self.assertEqual(score, 1)
+
+    def test_counterpoint(self):
+        notes = [("C4", 1), ("D4", 1), ("E4", 1), ("F4", 1)]
+        descant = [("E4", 1), ("F4", 1), ("F4", 1), ("F4", 1)]
+        evaluator = FitnessEvaluator(
+            chord_data=None, 
+            melody_data=MelodyData(notes=notes),
+            chord_mappings={},
+            notes=notes,
+            weights={}, 
+            preferred_transitions={}
+        )
+        score = evaluator._counterpoint(descant)
+        self.assertEqual(score, 0.75)
 
 
 class TestUtils(unittest.TestCase):
     def test_generate_notes(self):
         notes = utils.generate_notes(range=(60, 72), durations=[0.25, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0])
         self.assertEqual(len(notes), 104)
+
+    def test_get_weights_from_user(self):
+        with patch("builtins.input", side_effect=["1", "2", "3", "4", "5", "6"]):
+            weights = utils.get_weights_from_user()
+        self.assertEqual(weights, {
+            "chord_descant_congruence": 1/21,
+            "pitch_variety": 2/21,
+            "rhythmic_variety": 3/21,
+            "voice_leading": 4/21,
+            "functional_harmony": 5/21,
+            "counterpoint": 6/21
+        })
+
+    def test_get_weights_from_user_all_zero(self):
+        with patch("builtins.input", side_effect=["0", "0", "0", "0", "0", "0"]):
+            weights = utils.get_weights_from_user()
+        self.assertEqual(weights, {
+            "chord_descant_congruence": 0,
+            "pitch_variety": 0,
+            "rhythmic_variety": 0,
+            "voice_leading": 0,
+            "functional_harmony": 0,
+            "counterpoint": 0
+        })
 
 
 if __name__ == "__main__":

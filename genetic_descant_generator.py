@@ -144,6 +144,12 @@ class GeneticDescantGenerator:
                 self._population
             )
         )
+        # Print the final descant's scores for each fitness function
+        print("Best descant fitness scores:")
+        for func in self.fitness_evaluator.weights:
+            print(
+                f"{func}: {getattr(self.fitness_evaluator, f'_{func}')(best_descant)}"
+            )
         return best_descant
 
     def _initialise_population(self):
@@ -416,11 +422,15 @@ class FitnessEvaluator:
         melody_index, descant_index = 0, 0
         melody_time, descant_time = 0, 0
         previous_dissonant = False
+        prev_overlap_duration = 0.0
 
         while melody_time < self.melody_data.duration:
             melody_note, melody_duration = self.melody_data.notes[melody_index]
             descant_note, descant_duration = note_sequence[descant_index]
-            min_duration = min(melody_duration, descant_duration)
+            overlap_duration = (
+                min(melody_time + melody_duration, descant_time + descant_duration) \
+                    - max(melody_time, descant_time)
+            )
 
             # Find the interval between the current melody and descant notes
             melody_pitch = music21.pitch.Pitch(melody_note)
@@ -429,12 +439,17 @@ class FitnessEvaluator:
 
             # Check if the interval is consonant or dissonant
             if interval.isConsonant():
-                score += min_duration # Consonant intervals are preferred
+                score += overlap_duration # Consonant intervals are preferred
                 if previous_dissonant:
-                    score += 2*min_duration # Reward resolution of dissonance
+                    # Reward resolution of dissonance
+                    # Add prev_overlap_duration to correct for previously penalized dissonance
+                    score += prev_overlap_duration
+                    previous_dissonant = False
             else:
                 previous_dissonant = True
-                score -= min_duration # Penalize dissonant intervals
+                score -= overlap_duration # Penalize dissonant intervals
+
+            prev_overlap_duration = overlap_duration
             
             # Update the indices and durations
             # If the descant note ends before the melody note,
@@ -457,11 +472,11 @@ class FitnessEvaluator:
         assert melody_index == len(self.melody_data.notes), "Melody notes not fully evaluated"
         return score / self.melody_data.duration # Normalize by total duration
 
-    def _note_variety(self, note_sequence):
+    def _pitch_variety(self, note_sequence):
         """
-        Evaluates the diversity of notes used in the sequence. This function
-        calculates a score based on the number of unique notes present in the
-        sequence compared to the total available notes. Higher variety in the
+        Evaluates the diversity of pitches used in the sequence. This function
+        calculates a score based on the number of unique pitches present in the
+        sequence compared to the total available pitches. Higher variety in the
         note sequence results in a higher score, promoting musical
         complexity and interest.
 
@@ -469,35 +484,33 @@ class FitnessEvaluator:
             note_sequence (list): The note sequence to evaluate.
 
         Returns:
-            float: A normalized score representing the variety of notes in the
-                sequence relative to the total number of available notes.
+            float: A normalized score representing the variety of pitches in the
+                sequence relative to the total number of available pitches.
         """
-        # This currently accounts for rhythmic variety as well
-        # since note are represented as tuples (note_name, duration)
-        unique_notes = len(set(note_sequence))
-        total_notes = len(self.notes)
-        return unique_notes / total_notes
+        unique_pitches = len(set([pitch for pitch, _ in note_sequence]))
+        total_pitches = len(set([pitch for pitch, _ in self.notes]))
+        return unique_pitches / total_pitches
     
-    # def _rhythmic_variety(self, note_sequence):
-    #     """
-    #     Evaluates the diversity of rhythms used in the sequence. This function
-    #     calculates a score based on the number of unique rhythms present in the
-    #     sequence. Higher variety in the note sequence results in a higher score,
-    #     promoting musical complexity and interest.
+    def _rhythmic_variety(self, note_sequence):
+        """
+        Evaluates the diversity of rhythms used in the sequence. This function
+        calculates a score based on the number of unique rhythms present in the
+        sequence. Higher variety in the note sequence results in a higher score,
+        promoting musical complexity and interest.
 
-    #     Parameters:
-    #         note_sequence (list): The note sequence to evaluate.
+        Parameters:
+            note_sequence (list): The note sequence to evaluate.
 
-    #     Returns:
-    #         float: A normalized score representing the variety of rhythms in the
-    #             sequence.
-    #     """
-    #     # TODO: Do something different with rhythmic evaluation
-    #     # Variety between melody and descant rhythms, 
-    #     # or variety in rhythm from one note to the next
-    #     unique_rhythms = len(set(duration for _, duration in note_sequence))
-    #     total_rhythms = len(set(duration for _, duration in self.notes))
-    #     return unique_rhythms / total_rhythms
+        Returns:
+            float: A normalized score representing the variety of rhythms in the
+                sequence.
+        """
+        # TODO: Do something different with rhythmic evaluation
+        # Variety between melody and descant rhythms, 
+        # or variety in rhythm from one note to the next
+        unique_rhythms = len(set(duration for _, duration in note_sequence))
+        total_rhythms = len(set(duration for _, duration in self.notes))
+        return unique_rhythms / total_rhythms
 
     def _voice_leading(self, note_sequence):
         """
@@ -778,14 +791,7 @@ def main():
         ("D4", 1),
         ("C4", 4)
     ]
-    weights = {
-        "chord_descant_congruence": 0.15,
-        "note_variety": 0.15,
-        # "rhythmic_variety": 0.2,
-        "voice_leading": 0.4,
-        "functional_harmony": 0.1,
-        "counterpoint": 0.2
-    }
+    weights = utils.get_weights_from_user()
     assert sum(weights.values()) == 1, "Weights must sum to 1"
     chord_mappings = {
         "C": ["C", "E", "G"],
@@ -891,6 +897,7 @@ def main():
     # Choose Violin or Viola
     # instrument = "viola"
     instrument = "violin"
+    note_bank = violin_notes if instrument == "violin" else viola_notes
 
     # Choose which tune
     chords = joy_to_the_world_chords
@@ -906,20 +913,20 @@ def main():
         chord_data=chord_data,
         melody_data=melody_data,
         chord_mappings=chord_mappings,
-        notes=violin_notes if instrument == "violin" else viola_notes,
+        notes=note_bank,
         weights=weights,
         preferred_transitions=preferred_transitions,
     )
     generator = GeneticDescantGenerator(
         chord_data=chord_data,
-        notes=violin_notes if instrument == "violin" else viola_notes,
+        notes=note_bank,
         population_size=100,
         mutation_rate=0.05,
         fitness_evaluator=fitness_evaluator,
     )
 
     # Generate descant with genetic algorithm
-    generated_descant = generator.generate(generations=1000)
+    generated_descant = generator.generate(generations=200)
 
     # Render to music21 score and show it
     music21_score = create_score(
