@@ -3,7 +3,8 @@
 import librosa
 import numpy as np
 
-def generate_notes(range=(60, 72), durations=[0.25, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0]):
+def generate_notes(range=(60, 72), durations=[0.25, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0],
+                   chromatic=False):
     """
     Generate notes from the given range
     
@@ -12,13 +13,17 @@ def generate_notes(range=(60, 72), durations=[0.25, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0
             as a tuple of two MIDI note integers (start, end)
         durations (list): A list of avilable note durations expressed as
             floats relative to a quarter note
+        chromatic (bool): If False (default), only include diatonic notes
     
     Returns:
         notes (list): A list of notes expressed as tuples (pitch, duration)
     """
-    return [(pitch, duration)
-        for pitch in list(librosa.midi_to_note(np.arange(range[0], range[1]+1)))
+    notes = [(pitch, duration)
+        for pitch in list(librosa.midi_to_note(np.arange(range[0], range[1]+1), unicode=False))
         for duration in durations]
+    if not chromatic:
+        notes = [note for note in notes if note[0][:-1] in ["C", "D", "E", "F", "G", "A", "B"]]
+    return notes
 
 def get_weights_from_user():
     """

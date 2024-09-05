@@ -304,15 +304,14 @@ class FitnessEvaluator:
         chord_mappings (dict): Dictionary of chords with their corresponding notes.
         notes (list): List of available notes for the descant.
         weights (dict): Weights for different fitness evaluation functions.
-        preferred_transitions (dict): Preferred transitions between notes.
     """
 
     def __init__(
-        self, chord_data, melody_data, chord_mappings, notes, weights, preferred_transitions
+        self, chord_data, melody_data, chord_mappings, notes, weights
     ):
         """
         Initialize the FitnessEvaluator with accompaniment, melody, chord mappings,
-        notes, weights, and preferred transitions.
+        notes, and weights.
 
         Parameters:
             chord_data (ChordData): Accompaniment information.
@@ -320,14 +319,12 @@ class FitnessEvaluator:
             chord_mappings (dict): Available chords mapped to their notes.
             notes (list): Available notes for the descant.
             weights (dict): Weights for each fitness evaluation function.
-            preferred_transitions (dict): Preferred transitions between notes.
         """
         self.chord_data = chord_data
         self.melody_data = melody_data
         self.chord_mappings = chord_mappings
         self.notes = notes
         self.weights = weights
-        self.preferred_transitions = preferred_transitions
 
     def get_descant_with_highest_fitness(self, note_sequences):
         """
@@ -382,7 +379,7 @@ class FitnessEvaluator:
             chord_name, chord_duration = self.chord_data.chords[chord_index]
             # Check if the descant note is in the chord
             chord_notes = self.chord_mappings.get(chord_name, [])
-            if descant_note[0] in chord_notes:
+            if descant_note[:-1] in chord_notes:
                 # reward descant note that is in the chord
                 score += min(descant_duration, chord_duration)
             # Update the indices and durations
@@ -511,13 +508,13 @@ class FitnessEvaluator:
         unique_rhythms = len(set(duration for _, duration in note_sequence))
         total_rhythms = len(set(duration for _, duration in self.notes))
         return unique_rhythms / total_rhythms
-
+    
     def _voice_leading(self, note_sequence):
         """
         Assesses the voice leading of the note sequence by examining the
         transitions between successive notes. This function scores the
         sequence based on how frequently the note transitions align with
-        predefined preferred transitions. Smooth and musically pleasant
+        voice leading rules. Smooth and musically pleasant
         transitions result in a higher score.
 
         Parameters:
@@ -527,14 +524,26 @@ class FitnessEvaluator:
             float: A normalized score based on the frequency of preferred note
                 transitions in the sequence.
         """
-        # TODO: redo this function so it does not rely on a preferred transitions dict
-        # instead, evaluate based on the interval between notes
         score = 0
         for i in range(len(note_sequence) - 1):
+            current_note = note_sequence[i][0]
             next_note = note_sequence[i + 1][0]
-            if next_note in self.preferred_transitions[note_sequence[i][0]]:
+            current_pitch = music21.pitch.Pitch(current_note)
+            next_pitch = music21.pitch.Pitch(next_note)
+            interval = music21.interval.Interval(current_pitch, next_pitch)
+            if (current_note[0] == 'B' and interval.directedName == 'm2'):
+                # reward leading tone resolution
                 score += 1
-        return score / (len(note_sequence) - 1)
+            elif interval.name in ["m2", "M2", "m3", "M3"]:
+                # reward stepwise motion and motion by thirds
+                score += 1
+            elif interval.name == "P1":
+                # small penalty for repeated note
+                score -= 0.5
+            else:
+                # penalize leaps over a 3rd
+                score -= 1
+        return score / (len(note_sequence) - 1)    
 
     def _functional_harmony(self, note_sequence):
         """
@@ -552,9 +561,9 @@ class FitnessEvaluator:
                 the number of checks performed.
         """
         score = 0
-        if note_sequence[0][0][0] in ["C", "E", "G"]:
+        if note_sequence[0][0][:-1] in ["C", "E", "G"]:
             score += 1
-        if note_sequence[-1][0][0] in ["C", "E", "G"]:
+        if note_sequence[-1][0][:-1] in ["C", "E", "G"]:
             score += 1
         return score / 2
 
@@ -792,7 +801,6 @@ def main():
         ("C4", 4)
     ]
     weights = utils.get_weights_from_user()
-    assert sum(weights.values()) == 1, "Weights must sum to 1"
     chord_mappings = {
         "C": ["C", "E", "G"],
         "C/E": ["E", "G", "C"],
@@ -807,97 +815,12 @@ def main():
         "Am": ["A", "C", "E"],
         "Bdim": ["B", "D", "F"]
     }
-    violin_notes = [
-        # ("C4", 1),
-        # ("D4", 1),
-        ("E4", 1),
-        ("E4", 2),
-        ("E4", 3),
-        ("F4", 1),
-        ("F4", 2),
-        ("G4", 1),
-        ("G4", 2),
-        ("G4", 3),
-        ("G4", 4),
-        ("A4", 1),
-        ("A4", 2),
-        ("B4", 1),
-        ("B4", 2),
-        ("C5", 1),
-        ("C5", 2),
-        ("C5", 3),
-        ("C5", 4),
-        ("D5", 1),
-        ("D5", 2),
-        ("E5", 1),
-        ("E5", 2),
-        ("F5", 1),
-        ("F5", 2),
-        ("G5", 1),
-        ("G5", 2)
-        # ("A5", 1),
-        # ("B5", 1),
-        # ("C6", 1)
-    ]
-    viola_notes = [
-        # ("G3", 1),
-        # ("A3", 1),
-        # ("B3", 1),
-        ("C4", 1),
-        ("C4", 2),
-        ("C4", 3),
-        ("C4", 4),
-        ("D4", 1),
-        ("D4", 2),
-        ("E4", 1),
-        ("E4", 2),
-        ("E4", 3),
-        ("F4", 1),
-        ("F4", 2),
-        ("G4", 1),
-        ("G4", 2),
-        ("G4", 3),
-        ("A4", 1),
-        ("A4", 2),
-        ("B4", 1),
-        ("B4", 2),
-        ("C5", 1),
-        ("C5", 2),
-        ("C5", 3),
-        ("C5", 4),
-        ("D5", 1),
-        ("D5", 2),
-        ("E5", 1),
-        ("E5", 2)
-        # ("F5", 1),
-        # ("G5", 1),
-        # ("A5", 1),
-    ]
-    preferred_transitions = {
-        "G3": ["A3", "B3", "C4", "D4"],
-        "A3": ["G3", "B3", "C4", "D4"],
-        "B3": ["G3", "A3", "C4", "D4"],
-        "C4": ["G3", "A3", "B3", "C4", "D4", "E4", "G4", "A4"],
-        "D4": ["C4", "E4", "F4", "A4"],
-        "E4": ["C4", "D4", "F4", "G4"],
-        "F4": ["D4", "E4", "G4", "A4"],
-        "G4": ["C4", "A4", "B4", "C5"],
-        "A4": ["G4", "B4", "C5", "D5"],
-        "B4": ["G4", "A4", "C5", "D5"],
-        "C5": ["G4", "A4", "B4", "C5", "D5", "E5", "G5", "A5"],
-        "D5": ["C5", "E5", "F5"],
-        "E5": ["C5", "D5", "F5", "G5"],
-        "F5": ["D5", "E5", "G5", "A5"],
-        "G5": ["C5", "E5", "F5", "G5", "A5", "B5", "C6"],
-        "A5": ["C5", "D5", "F5", "G5", "B5", "C6", "D6"],
-        "B5": ["G5", "A5", "C6", "D6"],
-        "C6": ["C5", "G5", "A5", "B5", "C6"],
-    }
 
     # Choose Violin or Viola
     # instrument = "viola"
     instrument = "violin"
-    note_bank = violin_notes if instrument == "violin" else viola_notes
+    range = (60,84) if instrument == "violin" else (48,72)
+    note_bank = utils.generate_notes(range, chromatic=False)
 
     # Choose which tune
     chords = joy_to_the_world_chords
@@ -915,7 +838,6 @@ def main():
         chord_mappings=chord_mappings,
         notes=note_bank,
         weights=weights,
-        preferred_transitions=preferred_transitions,
     )
     generator = GeneticDescantGenerator(
         chord_data=chord_data,
@@ -926,7 +848,7 @@ def main():
     )
 
     # Generate descant with genetic algorithm
-    generated_descant = generator.generate(generations=200)
+    generated_descant = generator.generate(generations=500)
 
     # Render to music21 score and show it
     music21_score = create_score(
