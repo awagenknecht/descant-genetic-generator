@@ -48,26 +48,7 @@ class TestGeneticDescantGenerator(unittest.TestCase):
                     "voice_leading": 0.5,
                     "functional_harmony": 0.1,
                     "counterpoint": 0.1
-                    },
-            preferred_transitions={"G3": ["A3", "B3", "C4", "D4"],
-                                    "A3": ["G3", "B3", "C4", "D4"],
-                                    "B3": ["G3", "A3", "C4", "D4"],
-                                    "C4": ["G3", "A3", "B3", "C4", "D4", "E4", "G4", "A4"],
-                                    "D4": ["C4", "E4", "F4", "A4"],
-                                    "E4": ["C4", "D4", "F4", "G4"],
-                                    "F4": ["D4", "E4", "G4", "A4"],
-                                    "G4": ["C4", "A4", "B4", "C5"],
-                                    "A4": ["G4", "B4", "C5", "D5"],
-                                    "B4": ["G4", "A4", "C5", "D5"],
-                                    "C5": ["G4", "A4", "B4", "C5", "D5", "E5", "G5", "A5"],
-                                    "D5": ["C5", "E5", "F5"],
-                                    "E5": ["C5", "D5", "F5", "G5"],
-                                    "F5": ["D5", "E5", "G5", "A5"],
-                                    "G5": ["C5", "E5", "F5", "G5", "A5", "B5", "C6"],
-                                    "A5": ["C5", "D5", "F5", "G5", "B5", "C6", "D6"],
-                                    "B5": ["G5", "A5", "C6", "D6"],
-                                    "C6": ["C5", "G5", "A5", "B5", "C6"],
-                                }
+                    }
         )
         self.generator = GeneticDescantGenerator(
             chord_data=self.chord_data, 
@@ -136,8 +117,7 @@ class TestFitnessEvaluator(unittest.TestCase):
             melody_data=None,
             chord_mappings={"C": ["C", "E", "G"], "G": ["G", "B", "D"]},
             notes=[("C4", 1), ("D4", 1), ("E4", 1), ("F4", 1), ("G4", 1)],
-            weights={}, 
-            preferred_transitions={}
+            weights={}
         )
         score = evaluator._chord_descant_congruence(descant)
         self.assertGreater(score, 0)
@@ -151,8 +131,7 @@ class TestFitnessEvaluator(unittest.TestCase):
             melody_data=None,
             chord_mappings={},
             notes=notes,
-            weights={}, 
-            preferred_transitions={}
+            weights={}
         )
         score = evaluator._pitch_variety(descant)
         self.assertEqual(score, 0.5)
@@ -165,25 +144,22 @@ class TestFitnessEvaluator(unittest.TestCase):
             melody_data=None,
             chord_mappings={},
             notes=notes,
-            weights={}, 
-            preferred_transitions={}
+            weights={}
         )
         score = evaluator._rhythmic_variety(descant)
         self.assertEqual(score, 0.5)
 
     def test_voice_leading(self):
-        notes = [("C4", 1), ("D4", 1), ("E4", 1), ("F4", 1)]
-        descant = [("C4", 1), ("D4", 1), ("E4", 1), ("F4", 1)]
+        descant = [("C4", 1), ("C4", 1), ("D4", 1), ("F4", 1), ("B4", 1), ("C5", 1)]
         evaluator = FitnessEvaluator(
             chord_data=None, 
             melody_data=None,
             chord_mappings={},
-            notes=notes,
-            weights={}, 
-            preferred_transitions={"C4":"D4", "D4":"E4", "E4":"F4"}
+            notes=[],
+            weights={}
         )
         score = evaluator._voice_leading(descant)
-        self.assertEqual(score, 1)
+        self.assertEqual(score, 1.5 / 5)
 
     def test_functional_harmony(self):
         notes = [("C4", 1), ("D4", 1), ("E4", 1), ("F4", 1)]
@@ -193,8 +169,7 @@ class TestFitnessEvaluator(unittest.TestCase):
             melody_data=None,
             chord_mappings={"C": ["C", "E", "G"], "Dm": ["D", "F", "A"], "Em": ["E", "G", "B"], "F": ["F", "A", "C"]},
             notes=notes,
-            weights={}, 
-            preferred_transitions={}
+            weights={}
         )
         score = evaluator._functional_harmony(descant)
         self.assertEqual(score, 1)
@@ -207,8 +182,7 @@ class TestFitnessEvaluator(unittest.TestCase):
             melody_data=MelodyData(notes=notes),
             chord_mappings={},
             notes=notes,
-            weights={}, 
-            preferred_transitions={}
+            weights={}
         )
         score = evaluator._counterpoint(descant)
         self.assertEqual(score, 0.75)
@@ -216,7 +190,15 @@ class TestFitnessEvaluator(unittest.TestCase):
 
 class TestUtils(unittest.TestCase):
     def test_generate_notes(self):
-        notes = utils.generate_notes(range=(60, 72), durations=[0.25, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0])
+        # generate diatonic notes only
+        notes = utils.generate_notes(range=(60, 72), durations=[0.25, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0],
+                                     chromatic=False)
+        self.assertEqual(len(notes), 64)
+
+    def test_generate_notes_chromatic(self):
+        # generate chromatic notes
+        notes = utils.generate_notes(range=(60, 72), durations=[0.25, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0],
+                                     chromatic=True)
         self.assertEqual(len(notes), 104)
 
     def test_get_weights_from_user(self):
